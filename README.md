@@ -93,8 +93,7 @@ print(lidl.refresh_token)
 ```
 ## Usage
 Currently, the only features are fetching receipts and activating coupons
-### Receipts
-for receipt in lidl.tickets():
+
 ### Receipts
 
 #### API v3 Breaking Changes
