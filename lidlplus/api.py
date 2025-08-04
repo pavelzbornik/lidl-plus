@@ -7,6 +7,8 @@ import html
 import logging
 import re
 from datetime import datetime, timedelta
+from json import JSONDecodeError
+
 
 import requests
 
@@ -16,6 +18,8 @@ from lidlplus.exceptions import (
     LegalTermsException,
     MissingLogin,
 )
+from seleniumwire import webdriver
+from lidlplus.html_receipt import parse_html_receipt
 
 try:
     from getuseragent import UserAgent
@@ -32,6 +36,7 @@ try:
     from webdriver_manager.core.os_manager import ChromeType
 except ImportError:
     pass
+import time
 
 
 class LidlPlusApi:
@@ -39,7 +44,7 @@ class LidlPlusApi:
 
     _CLIENT_ID = "LidlPlusNativeClient"
     _AUTH_API = "https://accounts.lidl.com"
-    _TICKET_API = "https://tickets.lidlplus.com/api/v2"
+    _TICKET_API = "https://tickets.lidlplus.com/api"
     _COUPONS_API = "https://coupons.lidlplus.com/api"
     _COUPONS_V1_API = "https://coupons.lidlplus.com/app/api/"
     _PROFILE_API = "https://profile.lidlplus.com/profile/api"
@@ -131,6 +136,9 @@ class LidlPlusApi:
         }
         kwargs = {"headers": headers, "data": payload, "timeout": self._TIMEOUT}
         response = requests.post(f"{self._AUTH_API}/connect/token", **kwargs).json()
+        if "expires_in" not in response:
+            print("[ERROR] Unexpected token response:", response)
+            raise KeyError("'expires_in' not in token response")
         self._expires = datetime.utcnow() + timedelta(seconds=response["expires_in"])
         self._token = response["access_token"]
         self._refresh_token = response["refresh_token"]
@@ -201,29 +209,49 @@ class LidlPlusApi:
     def _check_2fa_auth(self, browser, wait, verify_mode="phone", verify_token_func=None):
         if verify_mode not in ["phone", "email"]:
             raise ValueError(f'Unknown 2fa-mode "{verify_mode}" - Only "phone" or "email" supported')
-        response = browser.wait_for_request(f"{self._AUTH_API}/Account/Login.*", 10).response
-        if "/connect/authorize/callback" not in response.headers.get("Location"):
+        req = browser.wait_for_request(f"{self._AUTH_API}/Account/Login.*", 10)
+        response = getattr(req, 'response', None)
+        location = None
+        if response is not None and hasattr(response, 'headers'):
+            location = response.headers.get("Location")
+        if response is None or location is None:
+            # If no response or Location header, assume 2FA is not required or login failed
+            return
+        if "/connect/authorize/callback" not in location:
             element = wait.until(expected_conditions.visibility_of_element_located((By.CLASS_NAME, verify_mode)))
             element.find_element(By.TAG_NAME, "button").click()
             verify_code = verify_token_func()
             browser.find_element(By.NAME, "VerificationCode").send_keys(verify_code)
             self._click(browser, (By.CLASS_NAME, "role_next"))
 
-    def login(self, phone, password, **kwargs):
-        """Simulate app auth"""
+    def login(self, email, password, **kwargs):
+        """Simulate app auth with updated selectors for new Lidl Plus login form."""
         browser = self._get_browser(headless=kwargs.get("headless", True))
         browser.get(self._register_link)
-        wait = WebDriverWait(browser, 10)
-        wait.until(expected_conditions.visibility_of_element_located((By.ID, "button_welcome_login"))).click()
-        wait.until(expected_conditions.visibility_of_element_located((By.NAME, "EmailOrPhone"))).send_keys(phone)
-        self._click(browser, (By.ID, "button_btn_submit_email"))
-        self._click(
-            browser,
-            (By.ID, "button_btn_submit_email"),
-            request=f"{self._AUTH_API}/api/phone/exists.*",
-        )
-        wait.until(expected_conditions.element_to_be_clickable((By.ID, "field_Password"))).send_keys(password)
-        self._click(browser, (By.ID, "button_submit"))
+        wait = WebDriverWait(browser, 20)
+        # Wait for the primary login button and click it to show the email/password form
+        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "button[data-testid='button-primary']"))).click()
+        # Wait for the email input and enter the email
+        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "input[data-testid='input-email']"))).send_keys(email)
+        # Wait for the password input and enter the password
+        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "input[data-testid='input-password']"))).send_keys(password)
+        # Click the primary login button to submit
+        browser.find_element(By.CSS_SELECTOR, "button[data-testid='button-primary']").click()
+
+        # Wait for a browser log message containing the protocol (language-agnostic), or timeout after 20 seconds
+        start_time = time.monotonic()
+        found = False
+        while time.monotonic() - start_time < 20:
+            for entry in browser.get_log('browser'):
+                msg = entry.get('message', '')
+                if "com.lidlplus.app://callback?code=" in msg:
+                    found = True
+                    break
+            if found:
+                break
+            time.sleep(0.5)
+        if not found:
+            print("[WARNING] Did not find the expected browser log message for callback within 20 seconds.")
         self._check_login_error(browser)
         self._check_2fa_auth(
             browser,
@@ -231,8 +259,23 @@ class LidlPlusApi:
             kwargs.get("verify_mode", "phone"),
             kwargs.get("verify_token_func"),
         )
-        browser.wait_for_request(f"{self._AUTH_API}/connect.*")
-        code = self._parse_code(browser, wait, accept_legal_terms=kwargs.get("accept_legal_terms", True))
+        # Look for the error message in browser logs
+        code = None
+        for entry in browser.get_log('browser'):
+            msg = entry.get('message', '')
+            if "com.lidlplus.app://callback?code=" in msg:
+                match = re.search(r"code=([0-9A-F]+)", msg)
+                if match:
+                    code = match.group(1)
+                    break
+        if not code:
+            # fallback to old method if not found in logs
+            browser.wait_for_request(f"{self._AUTH_API}/connect.*")
+            code = self._parse_code(browser, wait, accept_legal_terms=kwargs.get("accept_legal_terms", True))
+        if not code:
+            print("[ERROR] No authorization code found after login. The login may have failed or the form flow has changed.")
+            raise LoginError("No authorization code found after login. Check credentials, 2FA, or if the login form has changed.")
+        print(f"[DEBUG] Authorization code: {code}")
         self._authorization_code(code)
 
     def _default_headers(self):
@@ -257,7 +300,7 @@ class LidlPlusApi:
             If set to False (the default), all tickets will be retrieved.
         :type onlyFavorite: bool
         """
-        url = f"{self._TICKET_API}/{self._country}/tickets"
+        url = f"{self._TICKET_API}/v2/{self._country}/tickets"
         kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
         ticket = requests.get(f"{url}?pageNumber=1&onlyFavorite={only_favorite}", **kwargs).json()
         tickets = ticket["tickets"]
@@ -268,8 +311,12 @@ class LidlPlusApi:
     def ticket(self, ticket_id):
         """Get full data of single ticket by id"""
         kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
-        url = f"{self._TICKET_API}/{self._country}/tickets"
-        return requests.get(f"{url}/{ticket_id}", **kwargs).json()
+        url = f"{self._TICKET_API}/v3/{self._country}/tickets/{ticket_id}"
+        receipt_json = requests.get(url, **kwargs).json()
+        return parse_html_receipt(
+            date=receipt_json["date"],
+            html_receipt=receipt_json["htmlPrintedReceipt"],
+        )
 
     def coupon_promotions_v1(self):
         """Get list of all coupons API V1"""

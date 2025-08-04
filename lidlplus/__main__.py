@@ -7,11 +7,17 @@ import json
 import os
 import sys
 from getpass import getpass
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 from pathlib import Path
 from datetime import datetime, timezone
 
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    if load_dotenv:
+        load_dotenv()
 # pylint: disable=wrong-import-position
 from lidlplus import LidlPlusApi
 from lidlplus.exceptions import WebBrowserException, LoginError, LegalTermsException
@@ -24,10 +30,10 @@ def get_arguments():
         description="Lidl Plus API",
         formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=28),
     )
-    parser.add_argument("-c", "--country", metavar="CC", help="country (DE, BE, NL, AT, ...)")
-    parser.add_argument("-l", "--language", metavar="LANG", help="language (de, en, fr, it, ...)")
-    parser.add_argument("-u", "--user", help="Lidl Plus login username")
-    parser.add_argument("-p", "--password", metavar="XXX", help="Lidl Plus login password")
+    parser.add_argument("-c", "--country", metavar="CC", help="country (DE, BE, NL, AT, ...)", default=os.environ.get("LIDL_COUNTRY"))
+    parser.add_argument("-l", "--language", metavar="LANG", help="language (de, en, fr, it, ...)", default=os.environ.get("LIDL_LANGUAGE"))
+    parser.add_argument("-e", "--email", help="Lidl Plus login email", default=os.environ.get("LIDL_EMAIL"))
+    parser.add_argument("-p", "--password", metavar="XXX", help="Lidl Plus login password", default=os.environ.get("LIDL_PASSWORD"))
     parser.add_argument(
         "--2fa",
         choices=["phone", "email"],
@@ -59,11 +65,11 @@ def get_arguments():
 def check_auth():
     """check auth package is installed"""
     try:
-        # pylint: disable=import-outside-toplevel, unused-import
-        import oic
-        import seleniumwire
-        import getuseragent
-        import webdriver_manager
+        # pylint: disable=import-outside-toplevel
+        import importlib.util
+        for pkg in ["oic", "seleniumwire", "getuseragent", "webdriver_manager"]:
+            if importlib.util.find_spec(pkg) is None:
+                raise ImportError(pkg)
     except ImportError:
         print(
             "To login and receive a refresh token you need to install all auth requirements:\n"
@@ -84,13 +90,13 @@ def lidl_plus_login(args):
     country = args.get("country") or input("Enter your country (DE, AT, ...): ")
     if args.get("refresh_token"):
         return LidlPlusApi(language, country, args.get("refresh_token"))
-    username = args.get("user") or input("Enter your lidl plus username (phone number): ")
+    email = args.get("email") or input("Enter your lidl plus email: ")
     password = args.get("password") or getpass("Enter your lidl plus password: ")
     lidl_plus = LidlPlusApi(language, country)
     try:
         text = f"Enter the verify code you received via {args['2fa']}: "
         lidl_plus.login(
-            username,
+            email,
             password,
             verify_token_func=lambda: input(text),
             verify_mode=args["2fa"],
