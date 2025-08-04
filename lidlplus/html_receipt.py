@@ -33,8 +33,8 @@ def parse_html_receipt(date: str, html_receipt: str) -> dict[str, Any]:
             item = {
                 "artId": art_id,
                 "name": art_desc,
-                "currentUnitPrice": parse_float(unit_price) if unit_price else None,
-                "taxType": tax_type,
+                "currentUnitPrice": unit_price if unit_price else None,
+                "taxGroupName": tax_type,
                 "discounts": [],
             }
             # Quantity/weight
@@ -48,7 +48,7 @@ def parse_html_receipt(date: str, html_receipt: str) -> dict[str, Any]:
             else:
                 # Try to extract quantity from text if possible
                 item["isWeight"] = False
-                item["quantity"] = 1
+                item["quantity"] = "1"
 
             # Try to extract total price from text (last number before tax type)
             text = node.text.strip()
@@ -56,12 +56,12 @@ def parse_html_receipt(date: str, html_receipt: str) -> dict[str, Any]:
             # Only match numbers with at least one digit before and after comma
             m = re.search(r"(\d{1,3}(?:[.,]\d{2})+)\s*[A-Z]", text)
             if m and re.match(r"^\d+[.,]\d+$", m.group(1)):
-                item["totalPrice"] = parse_float(m.group(1))
+                item["originalAmount"] = m.group(1).replace(".", ",")
             else:
                 # fallback: try to get last float in text
                 floats = re.findall(r"\d+,[\d]+", text)
                 if floats:
-                    item["totalPrice"] = parse_float(floats[-1])
+                    item["originalAmount"] = floats[-1]
             last_item = item
             receipt["itemsLine"].append(item)
         # Discount line
@@ -78,13 +78,13 @@ def parse_html_receipt(date: str, html_receipt: str) -> dict[str, Any]:
                 except Exception:
                     pass
             elif text:
-                # Discount label
+                # Discount description
                 if last_item is not None:
-                    # Add as label to last discount if exists, else as new
+                    # Add as description to last discount if exists, else as new
                     if last_item["discounts"]:
-                        last_item["discounts"][-1]["label"] = text
+                        last_item["discounts"][-1]["description"] = text
                     else:
-                        last_item["discounts"].append({"label": text})
+                        last_item["discounts"].append({"description": text})
         # Currency line (header)
         elif node_class == "currency":
             receipt["currency"] = {"code": node.text.strip(), "symbol": node.attrib.get("data-currency")}

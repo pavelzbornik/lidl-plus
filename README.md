@@ -31,13 +31,52 @@ After we have received the token once, we can use it for further requestes and w
   ```bash
   pip install "lidl-plus[auth]"
   ```
+
+#### Using a .env File
+
+You can store your Lidl Plus credentials and settings in a `.env` file in your project root. This keeps sensitive information out of your code and makes configuration easier.
+
+**Example `.env` file:**
+```env
+LIDL_LANGUAGE=de
+LIDL_COUNTRY=AT
+LIDL_EMAIL=your_email@example.com
+LIDL_PASSWORD=your_password
+LIDL_REFRESH_TOKEN=your_refresh_token
+```
+
+If you have [`python-dotenv`](https://pypi.org/project/python-dotenv/) installed (it is included in the dependencies), these variables will be loaded automatically for both the CLI and Python usage.
+
+**In Python code:**
+```python
+import os
+language = os.environ["LIDL_LANGUAGE"]
+country = os.environ["LIDL_COUNTRY"]
+email = os.environ["LIDL_EMAIL"]
+password = os.environ["LIDL_PASSWORD"]
+refresh_token = os.environ["LIDL_REFRESH_TOKEN"]
+```
+
 #### Commandline-Tool
+
+**Without a `.env` file:**  
+You will be prompted for all required information:
 ```bash
 $ lidl-plus auth
 Enter your language (de, en, ...): de
 Enter your country (DE, AT, ...): AT
-Enter your lidl plus username (phone number): +4915784632296
+Enter your lidl plus email: your_email@example.com
 Enter your lidl plus password:
+Enter the verify code you received via phone: 590287
+------------------------- refresh token ------------------------
+2D4FC2A699AC703CAB8D017012658234917651203746021A4AA3F735C8A53B7F
+----------------------------------------------------------------
+```
+
+**With a `.env` file:**  
+All required information is loaded automatically and you will only be prompted for the 2FA code:
+```bash
+$ lidl-plus auth
 Enter the verify code you received via phone: 590287
 ------------------------- refresh token ------------------------
 2D4FC2A699AC703CAB8D017012658234917651203746021A4AA3F735C8A53B7F
@@ -49,14 +88,32 @@ Enter the verify code you received via phone: 590287
 from lidlplus import LidlPlusApi
 
 lidl = LidlPlusApi(language="de", country="AT")
-lidl.login(phone="+4915784632296", password="password", verify_token_func=lambda: input("Insert code: "))
+lidl.login(email="your_email@example.com", password="password", verify_token_func=lambda: input("Insert code: "))
 print(lidl.refresh_token)
 ```
 ## Usage
 Currently, the only features are fetching receipts and activating coupons
 ### Receipts
+for receipt in lidl.tickets():
+### Receipts
 
-Get your receipts as json and receive a list of bought items like:
+#### API v3 Breaking Changes
+
+Due to a change in the Lidl Plus API from v2 to v3, receipt data is no longer provided as structured JSON. Instead, receipts are now returned as HTML, which is parsed to reconstruct a schema as close as possible to the previous version. However, there are breaking changes:
+
+
+- **Removed fields:** The following fields that were present in the previous (v2) JSON API are no longer available in the v3 HTML-based response:
+
+    - `taxGroup`
+    - `codeInput` (barcode)
+    - `deposit`
+    - `giftSerialNumber`
+
+- **Data is parsed from HTML:** The receipt parser extracts as much information as possible from the HTML, but some details may be missing or less reliable than before.
+- **Schema compatibility:** The output format aims to be compatible with the previous JSON structure, but some fields may be absent or have different values.
+
+#### Example Output
+The parsed receipt data now looks like this (note: some fields may be missing or null):
 ```json
 {
     "currentUnitPrice": "2,19",
@@ -64,18 +121,14 @@ Get your receipts as json and receive a list of bought items like:
     "isWeight": false,
     "originalAmount": "2,19",
     "name": "Vegane Frikadellen",
-    "taxGroup": "1",
     "taxGroupName": "A",
-    "codeInput": "4023456245134",
     "discounts": [
         {
             "description": "5€ Coupon",
             "amount": "0,21"
         }
-    ],
-    "deposit": null,
-    "giftSerialNumber": null
-},
+    ]
+}
 ```
 
 #### Commandline-Tool
@@ -168,7 +221,7 @@ options:
   -h, --help                show this help message and exit
   -c CC, --country CC       country (DE, BE, NL, AT, ...)
   -l LANG, --language LANG  language (de, en, fr, it, ...)
-  -u USER, --user USER      Lidl Plus login username
+  -e EMAIL, --email EMAIL   Lidl Plus login email
   -p XXX, --password XXX    Lidl Plus login password
   --2fa {phone,email}       choose two factor auth method
   -r TOKEN, --refresh-token TOKEN
