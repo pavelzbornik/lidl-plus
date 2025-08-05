@@ -44,10 +44,21 @@ def parse_html_receipt(date: str, html_receipt: str) -> dict[str, Any]:
                     last_item["weightBreakdown"] = node_text
                 continue  # Skip to the next node
 
+            # --- START: ENCODING ISSUE RESOLUTION ---
+            # The item name is extracted from the node's text content, which is correctly
+            # encoded with HTML entities, unlike the corrupted 'data-art-description' attribute.
+            # The name is the initial part of the string, ending before two or more spaces.
+            name_match = re.match(r"^(.*?)\s{2,}", node_text)
+            
+            # Use the matched name. Fall back to the (corrupt) attribute if the pattern fails,
+            # ensuring the parser remains robust.
+            item_name = name_match.group(1).strip() if name_match else node.attrib.get("data-art-description")
+            # --- END: ENCODING ISSUE RESOLUTION ---
+
             # This is a regular article, so create a new item.
             item = {
                 "artId": node.attrib.get("data-art-id"),
-                "name": node.attrib.get("data-art-description"),
+                "name": item_name,
                 "currentUnitPrice": node.attrib.get("data-unit-price"),
                 "taxGroupName": node.attrib.get("data-tax-type"),
                 "quantity": node.attrib.get("data-art-quantity", "1"), # Default to 1 if not present
