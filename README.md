@@ -92,7 +92,8 @@ lidl.login(email="your_email@example.com", password="password", verify_token_fun
 print(lidl.refresh_token)
 ```
 ## Usage
-Currently, the only features are fetching receipts and activating coupons
+Features: fetching receipts, listing and activating coupons, reading your loyalty ID and
+profile, and looking up stores and supported countries.
 
 ### Receipts
 
@@ -146,48 +147,44 @@ for receipt in lidl.tickets():
 
 ### Coupons
 
-You can list all coupons and activate/deactivate them by id
+You can list all coupons and activate/deactivate them by id.
+
+> **Note:** Lidl retired the old coupon API; the package now uses the app promotions API
+> (`/app/api/v3/promotionslist`). The response is grouped into `sections`, each with a list of
+> **`promotions`** (previously this was `coupons`), and each promotion carries `validity.start`
+> / `validity.end` instead of the old `startValidityDate` / `endValidityDate`.
+
 ```json
 {
     "sections": [
         {
-            "name": "FavoriteStore",
-            "coupons": []
-        },
-        {
             "name": "AllStores",
-            "coupons": [
+            "promotions": [
                 {
-                    "id": "2c9b3554-a09c-412c-8be4-d41cbff13572",
-                    "image": "https://lidlplusprod.blob.core.windows.net/images/coupons/LT/IDISC0000254911.png?t=1695452076",
-                    "type": "Standard",
-                    "offerTitle": "1 + 1",
-                    "title": "👨🏻‍🍳 Frozen 👨🏻‍🍳",
-                    "offerDescriptionShort": "FREE",
-                    "isSegmented": false,
-                    "startValidityDate": "2023-09-24T21:00:00Z",
-                    "endValidityDate": "2023-10-01T20:59:59Z",
-                    "isActivated": false,
-                    "apologizeText": "Xxxxxxxxxxxxxxxxx",
-                    "apologizeStatus": false,
-                    "apologizeTitle": "Xxxxxxxxxxxxxxxxxxx",
+                    "id": "cc025801-4000-448f-8855-df6c0c5dab14",
                     "promotionId": "DISC0000254911",
-                    "tagSpecial": "",
-                    "firstColor": "#ffc700",
-                    "secondaryColor": null,
-                    "firstFontColor": "#4a4a4a",
-                    "secondaryFontColor": null,
-                    "isSpecial": false,
-                    "hasAsterisk": false,
+                    "image": "https://lidlplusprod.blob.core.windows.net/images/coupons/LT/IDISC0000254911.png",
+                    "type": "Standard",
+                    "discount": {
+                        "title": "1 + 1",
+                        "description": "FREE",
+                        "scope": "PRODUCT"
+                    },
+                    "title": "👨🏻‍🍳 Frozen 👨🏻‍🍳",
+                    "validity": {
+                        "start": "2026-06-04T17:30:00Z",
+                        "end": "2026-06-11T20:59:59Z"
+                    },
+                    "isActivated": false,
                     "isHappyHour": false,
+                    "isSpecial": false,
                     "stores": []
-                },
-                .......
+                }
             ]
         },
         {
-            "name": "OtherStores",
-            "coupons": []
+            "name": "OnlineShop",
+            "promotions": []
         }
     ]
 }
@@ -207,8 +204,39 @@ from lidlplus import LidlPlusApi
 
 lidl = LidlPlusApi("de", "AT", refresh_token="XXXXXXXXXX")
 for section in lidl.coupons()["sections"]:
-  for coupon in section["coupons"]:
-    print("found coupon: ", coupon["title"], coupon["id"])
+    for coupon in section["promotions"]:
+        print("found coupon: ", coupon["title"], coupon["id"])
+```
+
+### Loyalty ID & profile
+
+Read the loyalty/account id behind your in-store Lidl Plus barcode, and your profile claims.
+
+#### Commandline-Tool
+```bash
+$ lidl-plus --language=de --country=AT --refresh-token=XXXXX id
+```
+
+#### Python
+```python
+from lidlplus import LidlPlusApi
+
+lidl = LidlPlusApi("de", "AT", refresh_token="XXXXXXXXXX")
+print(lidl.loyalty_id())            # loyalty card id (plain text)
+print(lidl.user_info()["name"])     # OIDC profile claims: name, email, sub, ...
+```
+
+### Stores & countries
+
+Public endpoints — no login or refresh token required.
+
+#### Python
+```python
+from lidlplus import LidlPlusApi
+
+lidl = LidlPlusApi("de", "DE")
+print(len(lidl.stores()))           # all stores in the country (key, name, address, geo)
+print([c["id"] for c in lidl.countries()])   # supported Lidl Plus countries
 ```
 
 ## Help
