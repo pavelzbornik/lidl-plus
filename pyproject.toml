@@ -49,8 +49,7 @@ PyPI = "https://pypi.org/project/lidl-plus/"
 
 [dependency-groups]
 dev = [
-    "black>=22.12",
-    "flake8>=6.0",
+    "ruff>=0.6",
     "mypy>=0.991",
     "pylint>=2.15",
 ]
@@ -58,8 +57,27 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["lidlplus"]
 
-[tool.black]
+[tool.ruff]
 line-length = 120
+target-version = "py38"
+extend-exclude = [".venv", "dist", "build", "*.egg-info"]
+
+[tool.ruff.lint]
+# pyflakes (F) + pycodestyle (E/W) reproduce the old flake8 coverage;
+# pyupgrade (UP) and bugbear (B) are cheap, high-value extras.
+select = ["E", "F", "W", "UP", "B"]
+
+[tool.mypy]
+# No python_version pin: modern mypy only targets >=3.10, while the package still
+# supports 3.8 at runtime. Checking against the interpreter mypy runs under is fine
+# here since the code avoids version-specific typing constructs.
+files = ["lidlplus"]
+
+# These libs ship no type information; lxml's own stubs type xpath() as a broad
+# union that isn't worth fighting, so we treat all three as untyped.
+[[tool.mypy.overrides]]
+module = ["lxml.*", "getuseragent", "seleniumwire.*"]
+ignore_missing_imports = true
 
 [tool.pylint.format]
 max-line-length = 120

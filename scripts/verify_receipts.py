@@ -33,13 +33,13 @@ if not tickets:
     raise SystemExit(0)
 
 newest = tickets[0]
-print(f"    Newest ticket id={newest.get('id')} date={newest.get('date')} " f"total={newest.get('totalAmount')}")
+print(f"    Newest ticket id={newest.get('id')} date={newest.get('date')} total={newest.get('totalAmount')}")
 
 print(f"[4] Fetching full detail of newest ticket {newest['id']} (HTML -> parsed)...")
 detail = lidl.ticket(newest["id"])
 items = detail.get("itemsLine", []) if isinstance(detail, dict) else []
 print(f"    OK - parsed receipt with {len(items)} line item(s).")
 for item in items[:5]:
-    print(f"      - {item.get('name')!r}  qty={item.get('quantity')}  " f"price={item.get('originalAmount')}")
+    print(f"      - {item.get('name')!r}  qty={item.get('quantity')}  price={item.get('originalAmount')}")
 
 print("\n[RESULT] Package works: authenticated and retrieved receipts successfully.")

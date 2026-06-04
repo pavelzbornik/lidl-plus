@@ -1,5 +1,7 @@
 """Parse Lidl Plus HTML receipts into a JSON-like dict."""
 
+from __future__ import annotations
+
 import re
 from typing import Any
 
@@ -13,7 +15,7 @@ def parse_html_receipt(date: str, html_receipt: str) -> dict[str, Any]:
     parser = html.HTMLParser(encoding="utf-8")
     dom = html.fromstring(html_receipt.encode("utf-8"), parser=parser)
 
-    receipt = {
+    receipt: dict[str, Any] = {
         "date": date,
         "itemsLine": [],
         "currency": None,

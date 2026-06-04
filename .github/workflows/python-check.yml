@@ -21,12 +21,22 @@ jobs:
       uses: astral-sh/setup-uv@v5
     - name: Install dependencies
       run: uv sync --all-extras --dev --python ${{ matrix.python-version }}
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        uv run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        uv run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+    - name: Lint with ruff
+      run: uv run ruff check .
+    - name: Check formatting with ruff
+      run: uv run ruff format --check .
     - name: Analysing the code with pylint
       run: uv run pylint --max-line-length 120 lidlplus/
-    - name: Check black style
-      run: uv run black . -l 120 --check
+
+  type-check:
+    # Modern mypy can't run on Python 3.8, so type-check once on a current
+    # interpreter rather than across the runtime matrix.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+    - name: Install dependencies
+      run: uv sync --all-extras --dev --python 3.12
+    - name: Type-check with mypy
+      run: uv run mypy

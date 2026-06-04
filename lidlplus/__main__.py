@@ -12,13 +12,13 @@ from getpass import getpass
 try:
     from dotenv import load_dotenv
 except ImportError:
-    load_dotenv = None
+    load_dotenv = None  # type: ignore[assignment]
 from pathlib import Path
 from datetime import datetime, timezone
 
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    if load_dotenv:
+    if load_dotenv is not None:
         load_dotenv()
 # pylint: disable=wrong-import-position
 from lidlplus import LidlPlusApi
@@ -132,7 +132,7 @@ def print_refresh_token(args):
     """pretty print refresh token"""
     lidl_plus = lidl_plus_login(args)
     length = len(token := lidl_plus.refresh_token) - len("refresh token")
-    print(f"{'-' * (length // 2)} refresh token {'-' * (length // 2 - 1)}\n" f"{token}\n" f"{'-' * len(token)}")
+    print(f"{'-' * (length // 2)} refresh token {'-' * (length // 2 - 1)}\n{token}\n{'-' * len(token)}")
 
 
 def print_loyalty_id(args):
