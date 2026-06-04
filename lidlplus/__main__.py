@@ -2,11 +2,13 @@
 """
 lidl plus command line tool
 """
+
 import argparse
 import json
 import os
 import sys
 from getpass import getpass
+
 try:
     from dotenv import load_dotenv
 except ImportError:
@@ -30,10 +32,20 @@ def get_arguments():
         description="Lidl Plus API",
         formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=28),
     )
-    parser.add_argument("-c", "--country", metavar="CC", help="country (DE, BE, NL, AT, ...)", default=os.environ.get("LIDL_COUNTRY"))
-    parser.add_argument("-l", "--language", metavar="LANG", help="language (de, en, fr, it, ...)", default=os.environ.get("LIDL_LANGUAGE"))
+    parser.add_argument(
+        "-c", "--country", metavar="CC", help="country (DE, BE, NL, AT, ...)", default=os.environ.get("LIDL_COUNTRY")
+    )
+    parser.add_argument(
+        "-l",
+        "--language",
+        metavar="LANG",
+        help="language (de, en, fr, it, ...)",
+        default=os.environ.get("LIDL_LANGUAGE"),
+    )
     parser.add_argument("-e", "--email", help="Lidl Plus login email", default=os.environ.get("LIDL_EMAIL"))
-    parser.add_argument("-p", "--password", metavar="XXX", help="Lidl Plus login password", default=os.environ.get("LIDL_PASSWORD"))
+    parser.add_argument(
+        "-p", "--password", metavar="XXX", help="Lidl Plus login password", default=os.environ.get("LIDL_PASSWORD")
+    )
     parser.add_argument(
         "--2fa",
         choices=["phone", "email"],
@@ -67,6 +79,7 @@ def check_auth():
     try:
         # pylint: disable=import-outside-toplevel
         import importlib.util
+
         for pkg in ["oic", "seleniumwire", "getuseragent", "webdriver_manager"]:
             if importlib.util.find_spec(pkg) is None:
                 raise ImportError(pkg)

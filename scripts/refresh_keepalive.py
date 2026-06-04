@@ -6,6 +6,7 @@ before each receipts job) and you never need a browser login again.
 
     python scripts/refresh_keepalive.py
 """
+
 import os
 import re
 from pathlib import Path
@@ -27,8 +28,7 @@ new_token = lidl.refresh_token
 
 if new_token and new_token != old_token:
     text = ENV_PATH.read_text(encoding="utf-8")
-    text = re.sub(r"^LIDLPLUS_TOKEN=.*$", f"LIDLPLUS_TOKEN={new_token}",
-                  text, count=1, flags=re.MULTILINE)
+    text = re.sub(r"^LIDLPLUS_TOKEN=.*$", f"LIDLPLUS_TOKEN={new_token}", text, count=1, flags=re.MULTILINE)
     ENV_PATH.write_text(text, encoding="utf-8")
     print(f"[OK] Refresh token rotated and saved to .env (...{new_token[-6:]}).")
 else:

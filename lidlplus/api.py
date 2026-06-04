@@ -6,9 +6,8 @@ import base64
 import html
 import logging
 import re
+import time
 from datetime import datetime, timedelta
-from json import JSONDecodeError
-
 
 import requests
 
@@ -18,9 +17,11 @@ from lidlplus.exceptions import (
     LegalTermsException,
     MissingLogin,
 )
-from seleniumwire import webdriver
 from lidlplus.html_receipt import parse_html_receipt
 
+# Browser-login dependencies are optional (install with the "auth" extra). They are
+# only needed for login(); importing the package for refresh-token use must not require
+# them, so keep these inside the try/except — do NOT import seleniumwire at module top.
 try:
     from getuseragent import UserAgent
     from oic.oic import Client
@@ -36,7 +37,6 @@ try:
     from webdriver_manager.core.os_manager import ChromeType
 except ImportError:
     pass
-import time
 
 
 class LidlPlusApi:
@@ -226,9 +226,9 @@ class LidlPlusApi:
         if verify_mode not in ["phone", "email"]:
             raise ValueError(f'Unknown 2fa-mode "{verify_mode}" - Only "phone" or "email" supported')
         req = browser.wait_for_request(f"{self._AUTH_API}/Account/Login.*", 10)
-        response = getattr(req, 'response', None)
+        response = getattr(req, "response", None)
         location = None
-        if response is not None and hasattr(response, 'headers'):
+        if response is not None and hasattr(response, "headers"):
             location = response.headers.get("Location")
         if response is None or location is None:
             # If no response or Location header, assume 2FA is not required or login failed
@@ -246,16 +246,20 @@ class LidlPlusApi:
         browser.get(self._register_link)
         wait = WebDriverWait(browser, 20)
         # Wait for the primary login button and click it to show the email/password form
-        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "button[data-testid='button-primary']"))).click()
+        wait.until(
+            expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "button[data-testid='button-primary']"))
+        ).click()
         # Wait for the email input and enter the email
-        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "input[data-testid='input-email']"))).send_keys(email)
+        wait.until(
+            expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "input[data-testid='input-email']"))
+        ).send_keys(email)
         # Wait for the password input and enter the password.
         # Lidl renamed this field's testid to "login-input-password"; keep the old
         # "input-password" as a fallback in case the form flips back.
-        password_selector = (
-            "input[data-testid='login-input-password'], input[data-testid='input-password']"
+        password_selector = "input[data-testid='login-input-password'], input[data-testid='input-password']"
+        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, password_selector))).send_keys(
+            password
         )
-        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, password_selector))).send_keys(password)
         # Click the primary login button to submit
         browser.find_element(By.CSS_SELECTOR, "button[data-testid='button-primary']").click()
 
@@ -263,8 +267,8 @@ class LidlPlusApi:
         start_time = time.monotonic()
         found = False
         while time.monotonic() - start_time < 20:
-            for entry in browser.get_log('browser'):
-                msg = entry.get('message', '')
+            for entry in browser.get_log("browser"):
+                msg = entry.get("message", "")
                 if "com.lidlplus.app://callback?code=" in msg:
                     found = True
                     break
@@ -282,8 +286,8 @@ class LidlPlusApi:
         )
         # Look for the error message in browser logs
         code = None
-        for entry in browser.get_log('browser'):
-            msg = entry.get('message', '')
+        for entry in browser.get_log("browser"):
+            msg = entry.get("message", "")
             if "com.lidlplus.app://callback?code=" in msg:
                 match = re.search(r"code=([0-9A-F]+)", msg)
                 if match:
@@ -294,8 +298,13 @@ class LidlPlusApi:
             browser.wait_for_request(f"{self._AUTH_API}/connect.*")
             code = self._parse_code(browser, wait, accept_legal_terms=kwargs.get("accept_legal_terms", True))
         if not code:
-            print("[ERROR] No authorization code found after login. The login may have failed or the form flow has changed.")
-            raise LoginError("No authorization code found after login. Check credentials, 2FA, or if the login form has changed.")
+            print(
+                "[ERROR] No authorization code found after login. "
+                "The login may have failed or the form flow has changed."
+            )
+            raise LoginError(
+                "No authorization code found after login. Check credentials, 2FA, or if the login form has changed."
+            )
         print(f"[DEBUG] Authorization code: {code}")
         self._authorization_code(code)
 

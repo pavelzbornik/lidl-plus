@@ -6,6 +6,7 @@ Reads the PKCE verifier stashed by get_login_url.py, exchanges the code for a
 refresh token, persists it to .env (LIDLPLUS_TOKEN), and confirms receipt access.
 Authorization codes expire in ~60 seconds, so run this promptly.
 """
+
 import json
 import os
 import re

@@ -6,6 +6,7 @@ code for a refresh token.
 
     python scripts/get_login_url.py
 """
+
 import json
 import os
 from pathlib import Path
@@ -20,7 +21,6 @@ load_dotenv(ROOT / ".env")
 api = LidlPlusApi(os.environ["LIDL_LANGUAGE"], os.environ["LIDL_COUNTRY"])
 url = api._register_link  # generates code_challenge + sets api._code_verifier
 
-(ROOT / ".lidl_pkce.json").write_text(
-    json.dumps({"verifier": api._code_verifier}), encoding="utf-8")
+(ROOT / ".lidl_pkce.json").write_text(json.dumps({"verifier": api._code_verifier}), encoding="utf-8")
 
 print(url)
