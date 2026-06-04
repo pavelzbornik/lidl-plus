@@ -50,6 +50,10 @@ class LidlPlusApi:
     _PROFILE_API = "https://profile.lidlplus.com/profile/api"
     _APP = "com.lidlplus.app"
     _OS = "iOs"
+    # Lidl now tarpits (silently holds open, never responds) requests carrying an
+    # implausible app version such as the old "999.99.9" sentinel. A realistic,
+    # current app version is required for the API to respond.
+    _APP_VERSION = "15.30.0"
     _TIMEOUT = 10
 
     def __init__(self, language, country, refresh_token=""):
@@ -95,6 +99,14 @@ class LidlPlusApi:
         if headless:
             options.add_argument("headless")
         options.add_experimental_option("mobileEmulation", {"userAgent": user_agent})
+        # Prefer Selenium Manager (built into selenium >= 4.6): it resolves a matching
+        # chromedriver automatically and avoids the slow/flaky webdriver_manager
+        # download that can hang or fetch a wrong-arch binary.
+        try:
+            return webdriver.Chrome(options=options)
+        except Exception:  # pylint: disable=broad-except
+            pass
+        # Fallback: legacy webdriver_manager for Chrome / Edge / Chromium.
         for chrome_type in [ChromeType.GOOGLE, ChromeType.MSEDGE, ChromeType.CHROMIUM]:
             try:
                 service = Service(ChromeDriverManager(chrome_type=chrome_type).install())
@@ -233,8 +245,13 @@ class LidlPlusApi:
         wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "button[data-testid='button-primary']"))).click()
         # Wait for the email input and enter the email
         wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "input[data-testid='input-email']"))).send_keys(email)
-        # Wait for the password input and enter the password
-        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, "input[data-testid='input-password']"))).send_keys(password)
+        # Wait for the password input and enter the password.
+        # Lidl renamed this field's testid to "login-input-password"; keep the old
+        # "input-password" as a fallback in case the form flips back.
+        password_selector = (
+            "input[data-testid='login-input-password'], input[data-testid='input-password']"
+        )
+        wait.until(expected_conditions.visibility_of_element_located((By.CSS_SELECTOR, password_selector))).send_keys(password)
         # Click the primary login button to submit
         browser.find_element(By.CSS_SELECTOR, "button[data-testid='button-primary']").click()
 
@@ -285,7 +302,7 @@ class LidlPlusApi:
             raise MissingLogin("You need to login!")
         return {
             "Authorization": f"Bearer {self._token}",
-            "App-Version": "999.99.9",
+            "App-Version": self._APP_VERSION,
             "Operating-System": self._OS,
             "App": "com.lidl.eci.lidl.plus",
             "Accept-Language": self._language,
