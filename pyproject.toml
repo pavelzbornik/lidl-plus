@@ -49,10 +49,14 @@ dev = [
     "ruff>=0.6",
     "mypy>=0.991",
     "pylint>=2.15",
+    "pytest>=8.0",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["lidlplus"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120

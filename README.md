@@ -32,6 +32,7 @@ For local development, clone the repo and let uv create the environment and inst
 all extras (including the browser-login `auth` group) plus the dev tools:
 ```bash
 uv sync --all-extras --dev
+uv run pytest          # run the test suite
 ```
 
 ## Authentication
