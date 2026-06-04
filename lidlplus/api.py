@@ -45,8 +45,7 @@ class LidlPlusApi:
     _CLIENT_ID = "LidlPlusNativeClient"
     _AUTH_API = "https://accounts.lidl.com"
     _TICKET_API = "https://tickets.lidlplus.com/api"
-    _COUPONS_API = "https://coupons.lidlplus.com/api"
-    _COUPONS_V1_API = "https://coupons.lidlplus.com/app/api/"
+    _COUPONS_APP_API = "https://coupons.lidlplus.com/app/api"
     _PROFILE_API = "https://profile.lidlplus.com/api"
     _STORES_API = "https://stores.lidlplus.com/api"
     _CONFIG_API = "https://appgateway.lidlplus.com/configurationapp"
@@ -341,33 +340,38 @@ class LidlPlusApi:
         )
 
     def coupon_promotions_v1(self):
-        """Get list of all coupons API V1"""
-        url = f"{self._COUPONS_V1_API}/v1/promotionslist"
+        """Get list of all coupon promotions.
+
+        Uses the current app endpoint ``/app/api/v3/promotionslist`` (the method name is
+        kept for backwards compatibility). Returns
+        ``{"sections": [{"name": ..., "promotions": [...]}]}``.
+        """
+        url = f"{self._COUPONS_APP_API}/v3/promotionslist"
         kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
         return requests.get(url, **kwargs).json()
 
     def activate_coupon_promotion_v1(self, promotion_id):
-        """Activate single coupon by id API V1"""
-        url = f"{self._COUPONS_V1_API}/v1/promotions/{promotion_id}/activation"
+        """Activate a single coupon promotion by id (``/app/api/v2/promotions/{id}/activation``)."""
+        url = f"{self._COUPONS_APP_API}/v2/promotions/{promotion_id}/activation"
         kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
         return requests.post(url, **kwargs)
 
     def coupons(self):
-        """Get list of all coupons.
+        """Get list of all coupon promotions.
 
         The legacy v2 endpoint (``coupons.lidlplus.com/api/v2/{country}``) was retired
-        by Lidl and now returns 404, so this delegates to the live V1 promotions API.
-        Returns ``{"sections": [{"name": ..., "promotions": [...]}]}``.
+        by Lidl (404); this delegates to the current promotions API. Returns
+        ``{"sections": [{"name": ..., "promotions": [...]}]}``.
         """
         return self.coupon_promotions_v1()
 
     def activate_coupon(self, coupon_id):
-        """Activate single coupon by id (V1 promotions API)."""
+        """Activate single coupon by id (promotions API)."""
         return self.activate_coupon_promotion_v1(coupon_id)
 
     def deactivate_coupon(self, coupon_id):
-        """Deactivate single coupon by id (V1 promotions API)."""
-        url = f"{self._COUPONS_V1_API}/v1/promotions/{coupon_id}/activation"
+        """Deactivate single coupon by id (``/app/api/v2/promotions/{id}/activation``)."""
+        url = f"{self._COUPONS_APP_API}/v2/promotions/{coupon_id}/activation"
         kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
         return requests.delete(url, **kwargs)
 

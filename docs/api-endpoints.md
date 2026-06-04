@@ -41,9 +41,9 @@ See [authentication.md](authentication.md) for the full flow.
 | --- | --- | --- | --- |
 | GET | `tickets.lidlplus.com/api/v2/{CC}/tickets?pageNumber=N&onlyFavorite=` | `tickets()` | ✅ 200 |
 | GET | `tickets.lidlplus.com/api/v3/{CC}/tickets/{id}` | `ticket(id)` | ✅ 200 (HTML receipt) |
-| GET | `coupons.lidlplus.com/app/api/v1/promotionslist` *(needs `Country` header)* | `coupons()` and `coupon_promotions_v1()` | ✅ 200 |
-| POST | `coupons.lidlplus.com/app/api/v1/promotions/{id}/activation` *(`Country` header)* | `activate_coupon(id)` and `activate_coupon_promotion_v1(id)` | mutating — not probed |
-| DELETE | `coupons.lidlplus.com/app/api/v1/promotions/{id}/activation` *(`Country` header)* | `deactivate_coupon(id)` | mutating — not probed |
+| GET | `coupons.lidlplus.com/app/api/v3/promotionslist` *(needs `Country` header)* | `coupons()` and `coupon_promotions_v1()` | ✅ 200 |
+| POST | `coupons.lidlplus.com/app/api/v2/promotions/{id}/activation` *(`Country` header)* | `activate_coupon(id)` and `activate_coupon_promotion_v1(id)` | mutating — not probed |
+| DELETE | `coupons.lidlplus.com/app/api/v2/promotions/{id}/activation` *(`Country` header)* | `deactivate_coupon(id)` | mutating — not probed |
 | GET | `profile.lidlplus.com/api/v1/{CC}/loyalty` | `loyalty_id()` | ✅ 200 (plain-text card id) |
 | GET | `accounts.lidl.com/connect/userinfo` | `user_info()` | ✅ 200 |
 | GET | `stores.lidlplus.com/api/v4/{CC}` *(no auth; `User-Agent` only)* | `stores()` | ✅ 200 (1642 FR stores) |
@@ -52,9 +52,10 @@ See [authentication.md](authentication.md) for the full flow.
 > The legacy v2 coupon endpoints (`coupons.lidlplus.com/api/v2/{CC}` and
 > `…/api/v1/{CC}/{id}/activation`) were retired by Lidl (404). `coupons()`,
 > `activate_coupon()`, and `deactivate_coupon()` were **repointed to the live V1
-> promotions API**, so they share endpoints with their `*_v1` counterparts. (The app's
-> current version is **v3** — `…/app/api/v3/promotionslist` + `…/v2/promotions/{id}/activation`
-> — which also works; v1 is kept for now.)
+> promotions API**, so they share endpoints with their `*_v1` counterparts — now on the
+> current app versions: **v3** list (`…/app/api/v3/promotionslist`) + **v2** activation
+> (`…/app/api/v2/promotions/{id}/activation`). (The `*_v1` method names are kept for
+> backwards compatibility.)
 >
 > `loyalty_id()` lives at `profile.lidlplus.com/**api**/v1/{CC}/loyalty` — the package
 > previously used a wrong `…/**profile**/api/v1/…` path that 404'd. The host is alive.
@@ -62,10 +63,11 @@ See [authentication.md](authentication.md) for the full flow.
 ### Takeaways
 
 - **Core receipts work.** `tickets()` + `ticket()` are healthy — the package's main feature is fine.
-- **Coupons now work.** The live coupon surface is the **V1 promotions** API
-  (`/app/api/v1/promotionslist` + `/promotions/{id}/activation`). The legacy v2 endpoints were
-  retired (404); `coupons()` / `activate_coupon()` / `deactivate_coupon()` have been repointed to
-  V1 and the CLI `coupon` command was consolidated onto the single working path.
+- **Coupons now work.** The live coupon surface is the **app promotions** API — list on **v3**
+  (`/app/api/v3/promotionslist`), activate/deactivate on **v2**
+  (`/app/api/v2/promotions/{id}/activation`). The legacy `coupons.lidlplus.com/api/v2` endpoints
+  were retired (404); `coupons()` / `activate_coupon()` / `deactivate_coupon()` were repointed and
+  the CLI `coupon` command consolidated onto this single working path.
 - **Loyalty works again** — the host was never dead; the package just had a wrong path
   (`/profile/api/v1/…` instead of `/api/v1/…`). `loyalty_id()` now returns the real plain-text
   loyalty card id. A new `user_info()` additionally exposes the OIDC profile claims.
@@ -111,6 +113,5 @@ Gathered from sibling clients ([LittleMinus](https://github.com/Philipp0002/Litt
   promotions API and consolidated the CLI `coupon` command.
 - ✅ Done: fixed `loyalty_id()` (corrected path → real card id), added `user_info()`, and added
   `stores()` + `countries()` (discovered from the LittleMinus source).
-- Optional: bump coupons to **v3** (`/app/api/v3/promotionslist` + `/v2/.../activation`) to match
-  the current app; v1 still works.
+- ✅ Done: bumped coupons to the current app versions (v3 list + v2 activation).
 - Alerts and Lidl Pay would need fresh app-traffic capture to rediscover their current hosts.
