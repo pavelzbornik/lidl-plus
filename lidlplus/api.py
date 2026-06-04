@@ -47,9 +47,14 @@ class LidlPlusApi:
     _TICKET_API = "https://tickets.lidlplus.com/api"
     _COUPONS_API = "https://coupons.lidlplus.com/api"
     _COUPONS_V1_API = "https://coupons.lidlplus.com/app/api/"
-    _PROFILE_API = "https://profile.lidlplus.com/profile/api"
+    _PROFILE_API = "https://profile.lidlplus.com/api"
+    _STORES_API = "https://stores.lidlplus.com/api"
+    _CONFIG_API = "https://appgateway.lidlplus.com/configurationapp"
     _APP = "com.lidlplus.app"
     _OS = "iOs"
+    # Sent on the unauthenticated stores/countries endpoints, which reject requests
+    # without a Lidl Plus client User-Agent.
+    _USER_AGENT = "LidlPlus/16.0.0 (iPhone; iOS 17.0; Scale/3.00)"
     # Lidl now tarpits (silently holds open, never responds) requests carrying an
     # implausible app version such as the old "999.99.9" sentinel. A realistic,
     # current app version is required for the API to respond.
@@ -379,12 +384,33 @@ class LidlPlusApi:
         return response.json()
 
     def loyalty_id(self):
-        """Get your loyalty/account ID.
+        """Get your loyalty card ID (the number behind your in-store Lidl Plus barcode).
 
-        The dedicated loyalty endpoint (``profile.lidlplus.com/.../loyalty``) and its
-        whole host were retired by Lidl (404). This now returns the OpenID Connect
-        subject id (``sub``) from :meth:`user_info` — a stable per-account identifier.
-        Note: this is *not* the legacy scannable loyalty-card number, which the API no
-        longer exposes anywhere reachable.
+        Served as plain text by ``profile.lidlplus.com/api/v1/{country}/loyalty``.
+        (The package previously used a wrong ``/profile/api/...`` path that 404'd.)
         """
-        return self.user_info()["sub"]
+        url = f"{self._PROFILE_API}/v1/{self._country}/loyalty"
+        kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
+        response = requests.get(url, **kwargs)
+        response.raise_for_status()
+        return response.text
+
+    def stores(self):
+        """Get the list of stores for the configured country.
+
+        Public endpoint (no authentication) on ``stores.lidlplus.com/api/v4/{country}``;
+        returns store key, name, address and geo-location.
+        """
+        url = f"{self._STORES_API}/v4/{self._country}"
+        kwargs = {"headers": {"User-Agent": self._USER_AGENT}, "timeout": self._TIMEOUT}
+        response = requests.get(url, **kwargs)
+        response.raise_for_status()
+        return response.json()
+
+    def countries(self):
+        """Get the list of supported Lidl Plus countries (public, no authentication)."""
+        url = f"{self._CONFIG_API}/v3/countries"
+        kwargs = {"headers": {"User-Agent": self._USER_AGENT}, "timeout": self._TIMEOUT}
+        response = requests.get(url, **kwargs)
+        response.raise_for_status()
+        return response.json()
