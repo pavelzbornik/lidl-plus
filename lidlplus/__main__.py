@@ -146,30 +146,18 @@ def activate_coupons(args):
         print(json.dumps(coupons, indent=4))
         return
     i = 0
-    for section in coupons.get("sections", {}):
-        for coupon in section.get("coupons", {}):
-            if coupon["isActivated"]:
-                continue
-            if datetime.fromisoformat(coupon["startValidityDate"]) > datetime.now(timezone.utc):
-                continue
-            if datetime.fromisoformat(coupon["endValidityDate"]) < datetime.now(timezone.utc):
-                continue
-            print("activating coupon: ", coupon["title"])
-            lidl_plus.activate_coupon(coupon["id"])
-            i += 1
-    # Some coupons are only available through V1 API
-    coupons = lidl_plus.coupon_promotions_v1()
-    for section in coupons.get("sections", {}):
-        for coupon in section.get("promotions", {}):
-            if coupon["isActivated"]:
+    # coupons() returns the V1 promotions structure: sections -> promotions.
+    for section in coupons.get("sections", []):
+        for coupon in section.get("promotions", []):
+            if coupon.get("isActivated"):
                 continue
             validity = coupon.get("validity", {})
-            if datetime.fromisoformat(validity["start"]) > datetime.now(timezone.utc):
+            if validity.get("start") and datetime.fromisoformat(validity["start"]) > datetime.now(timezone.utc):
                 continue
-            if datetime.fromisoformat(validity["end"]) < datetime.now(timezone.utc):
+            if validity.get("end") and datetime.fromisoformat(validity["end"]) < datetime.now(timezone.utc):
                 continue
-            print("activating coupon v1: ", coupon["title"])
-            lidl_plus.activate_coupon_promotion_v1(coupon["promotionId"])
+            print("activating coupon: ", coupon["title"])
+            lidl_plus.activate_coupon(coupon["promotionId"])
             i += 1
     print(f"Activated {i} coupons")
 

@@ -348,22 +348,23 @@ class LidlPlusApi:
         return requests.post(url, **kwargs)
 
     def coupons(self):
-        """Get list of all coupons"""
-        url = f"{self._COUPONS_API}/v2/{self._country}"
-        kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
-        return requests.get(url, **kwargs).json()
+        """Get list of all coupons.
+
+        The legacy v2 endpoint (``coupons.lidlplus.com/api/v2/{country}``) was retired
+        by Lidl and now returns 404, so this delegates to the live V1 promotions API.
+        Returns ``{"sections": [{"name": ..., "promotions": [...]}]}``.
+        """
+        return self.coupon_promotions_v1()
 
     def activate_coupon(self, coupon_id):
-        """Activate single coupon by id"""
-        url = f"{self._COUPONS_API}/v1/{self._country}/{coupon_id}/activation"
-        kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
-        return requests.post(url, **kwargs).json()
+        """Activate single coupon by id (V1 promotions API)."""
+        return self.activate_coupon_promotion_v1(coupon_id)
 
     def deactivate_coupon(self, coupon_id):
-        """Deactivate single coupon by id"""
-        url = f"{self._COUPONS_API}/v1/{self._country}/{coupon_id}/activation"
-        kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
-        return requests.delete(url, **kwargs).json()
+        """Deactivate single coupon by id (V1 promotions API)."""
+        url = f"{self._COUPONS_V1_API}/v1/promotions/{coupon_id}/activation"
+        kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
+        return requests.delete(url, **kwargs)
 
     def loyalty_id(self):
         """Get your loyalty ID"""

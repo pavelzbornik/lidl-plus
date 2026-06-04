@@ -1,5 +1,7 @@
 # Lidl Plus Authentication
 
+> See also: [api-endpoints.md](api-endpoints.md) — what the API exposes and how much the package maps.
+
 How to obtain and maintain credentials for this package. Two paths exist:
 
 1. **Refresh token (recommended)** — headless, no browser, no CAPTCHA. Use this for all normal/automated runs.
