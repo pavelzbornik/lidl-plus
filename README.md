@@ -260,6 +260,11 @@ print([c["id"] for c in lidl.countries()])   # supported Lidl Plus countries
 ## Help
 #### Commandline-Tool
 ```commandline
+usage: lidl-plus [-h] [-c CC] [-l LANG] [-e EMAIL] [-p XXX]
+                 [--2fa {phone,email}] [-r TOKEN] [--skip-verify]
+                 [--not-accept-legal-terms] [-d]
+                 command ...
+
 Lidl Plus API
 
 options:
@@ -276,9 +281,11 @@ options:
   -d, --debug               debug mode
 
 commands:
-  auth                      authenticate and get token
-  receipt                   output last receipts as json
-  coupon                    activate coupons
+  command
+    auth                    authenticate and get token
+    id                      show loyalty ID
+    receipt                 output last receipts as json
+    coupon                  activate coupons
 ```
 
 ## Support
