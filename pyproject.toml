@@ -7,7 +7,7 @@ name = "lidl-plus"
 version = "0.3.5"
 description = "Fetch receipts and more from Lidl Plus"
 readme = "README.md"
-requires-python = ">=3.8.1"
+requires-python = ">=3.11"
 license = { file = "LICENCE" }
 authors = [{ name = "Andre Basche" }]
 keywords = ["lidl", "lidl plus", "receipts", "coupons", "api"]
@@ -17,9 +17,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -59,7 +56,7 @@ packages = ["lidlplus"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py311"
 extend-exclude = [".venv", "dist", "build", "*.egg-info"]
 
 [tool.ruff.lint]
@@ -68,9 +65,7 @@ extend-exclude = [".venv", "dist", "build", "*.egg-info"]
 select = ["E", "F", "W", "UP", "B"]
 
 [tool.mypy]
-# No python_version pin: modern mypy only targets >=3.10, while the package still
-# supports 3.8 at runtime. Checking against the interpreter mypy runs under is fine
-# here since the code avoids version-specific typing constructs.
+python_version = "3.11"
 files = ["lidlplus"]
 
 # These libs ship no type information; lxml's own stubs type xpath() as a broad

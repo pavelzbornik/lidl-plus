@@ -14,7 +14,7 @@ try:
 except ImportError:
     load_dotenv = None  # type: ignore[assignment]
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -165,9 +165,9 @@ def activate_coupons(args):
             if coupon.get("isActivated"):
                 continue
             validity = coupon.get("validity", {})
-            if validity.get("start") and datetime.fromisoformat(validity["start"]) > datetime.now(timezone.utc):
+            if validity.get("start") and datetime.fromisoformat(validity["start"]) > datetime.now(UTC):
                 continue
-            if validity.get("end") and datetime.fromisoformat(validity["end"]) < datetime.now(timezone.utc):
+            if validity.get("end") and datetime.fromisoformat(validity["end"]) < datetime.now(UTC):
                 continue
             print("activating coupon: ", coupon["title"])
             lidl_plus.activate_coupon(coupon["promotionId"])

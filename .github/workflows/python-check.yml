@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
@@ -29,14 +29,13 @@ jobs:
       run: uv run pylint --max-line-length 120 lidlplus/
 
   type-check:
-    # Modern mypy can't run on Python 3.8, so type-check once on a current
-    # interpreter rather than across the runtime matrix.
+    # Type-check once against the minimum supported interpreter.
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Install uv
       uses: astral-sh/setup-uv@v5
     - name: Install dependencies
-      run: uv sync --all-extras --dev --python 3.12
+      run: uv sync --all-extras --dev --python 3.11
     - name: Type-check with mypy
       run: uv run mypy
