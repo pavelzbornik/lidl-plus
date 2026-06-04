@@ -12,8 +12,26 @@
 
 Fetch receipts and more from Lidl Plus.
 ## Installation
+With [uv](https://docs.astral.sh/uv/) (recommended):
+```bash
+uv add lidl-plus
+```
+
+Or with pip:
 ```bash
 pip install lidl-plus
+```
+
+#### From source
+This repository is a fork. To install it directly from the source instead of PyPI:
+```bash
+uv pip install "git+https://github.com/pavelzbornik/lidl-plus"
+```
+
+For local development, clone the repo and let uv create the environment and install
+all extras (including the browser-login `auth` group) plus the dev tools:
+```bash
+uv sync --all-extras --dev
 ```
 
 ## Authentication
@@ -29,7 +47,7 @@ After we have received the token once, we can use it for further requestes and w
   - Microsoft Edge
 * Install additional python packages
   ```bash
-  pip install "lidl-plus[auth]"
+  uv add "lidl-plus[auth]"   # or: pip install "lidl-plus[auth]"
   ```
 
 #### Using a .env File
