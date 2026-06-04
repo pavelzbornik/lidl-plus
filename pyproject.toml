@@ -57,6 +57,12 @@ packages = ["lidlplus"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Integration tests hit the real Lidl API; deselect them by default so the
+# normal run stays offline. Opt in with: uv run pytest -m integration
+addopts = "-m 'not integration'"
+markers = [
+    "integration: live tests that call the real Lidl Plus API (network + token)",
+]
 
 [tool.ruff]
 line-length = 120

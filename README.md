@@ -32,8 +32,15 @@ For local development, clone the repo and let uv create the environment and inst
 all extras (including the browser-login `auth` group) plus the dev tools:
 ```bash
 uv sync --all-extras --dev
-uv run pytest          # run the test suite
+uv run pytest                  # offline unit tests
+uv run pytest -m integration   # live tests against the real API (see below)
 ```
+
+The `integration` tests validate that Lidl's endpoints still respond as expected.
+They hit the network and are **deselected by default**. The public endpoints
+(`countries`, `stores`) need no credentials; the authenticated ones read a refresh
+token from `LIDLPLUS_TOKEN` or `LIDL_REFRESH_TOKEN` (a `.env` is loaded
+automatically) and skip when it is missing. Note that using the token rotates it.
 
 ## Authentication
 To login in Lidl Plus we need to simulate the app login.
