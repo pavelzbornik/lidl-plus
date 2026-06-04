@@ -86,7 +86,7 @@ def check_auth():
     except ImportError:
         print(
             "To login and receive a refresh token you need to install all auth requirements:\n"
-            '  pip install "lidl-plus[auth]"\n'
+            '  uv add "lidl-plus[auth]"   # or: pip install "lidl-plus[auth]"\n'
             "You also need google chrome to be installed."
         )
         sys.exit(1)
