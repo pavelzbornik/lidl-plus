@@ -22,6 +22,8 @@ indefinitely.
 
 ### `.env` keys
 
+Copy [`.env.example`](../.env.example) to `.env` and fill in your values (`.env` is gitignored):
+
 ```env
 LIDL_LANGUAGE=fr
 LIDL_COUNTRY=FR
