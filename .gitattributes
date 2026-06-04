@@ -1,0 +1,17 @@
+# Normalize line endings: LF in the repository and in working copies, so the
+# project is consistent regardless of each contributor's core.autocrlf setting.
+* text=auto eol=lf
+
+# Windows batch files genuinely need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets: never normalize or diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.whl binary
+*.tar.gz binary
+*.zip binary
