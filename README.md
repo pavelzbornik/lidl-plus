@@ -257,6 +257,49 @@ print(len(lidl.stores()))           # all stores in the country (key, name, addr
 print([c["id"] for c in lidl.countries()])   # supported Lidl Plus countries
 ```
 
+## Caching
+
+The API client can cache responses locally so repeated calls are served from disk
+instead of hitting Lidl's servers. Caching is **opt-in** and off by default.
+
+Enable it by passing `cache=True` to the constructor (or a `cache_dir` to choose
+where files live; the default is your OS cache directory, e.g.
+`%LOCALAPPDATA%\lidl-plus` on Windows or `~/.cache/lidl-plus` on Linux):
+
+```python
+from lidlplus import LidlPlusApi
+
+lidl = LidlPlusApi("de", "AT", refresh_token="XXXXXXXXXX", cache=True)
+
+lidl.tickets()        # first call hits the API and stores the result
+lidl.tickets()        # second call is served from the local cache
+
+lidl.clear_cache()    # wipe all cached responses
+```
+
+Each endpoint has a sensible time-to-live, so volatile data refreshes on its own
+while stable data is reused:
+
+| Data | Cache lifetime |
+|---|---|
+| `ticket(id)` (a single past receipt) | forever — receipts are immutable |
+| `tickets()`, `coupons()` | 5 minutes |
+| `stores()`, `user_info()`, `loyalty_id()` | 1 day |
+| `countries()` | 7 days |
+
+Activating or deactivating a coupon automatically invalidates the cached coupon
+list, so you never act on a stale activation state.
+
+On the command line, add `--cache` (and optionally `--cache-dir DIR`):
+
+```bash
+$ lidl-plus --language=de --country=AT --refresh-token=XXXXX --cache receipt --all > data.json
+```
+
+> **Note:** cache keys are namespaced by country, not by account. If you use
+> multiple Lidl Plus accounts in the same country on one machine, give each its own
+> `cache_dir` to keep their data separate.
+
 ## Help
 #### Commandline-Tool
 ```commandline
@@ -276,6 +319,8 @@ options:
   --2fa {phone,email}       choose two factor auth method
   -r TOKEN, --refresh-token TOKEN
                             refresh token to authenticate
+  --cache                   cache API responses locally
+  --cache-dir DIR           directory for the local cache
   --skip-verify             skip ssl verification
   --not-accept-legal-terms  not auto accept legal terms updates
   -d, --debug               debug mode

@@ -83,4 +83,12 @@ max-line-length = 120
 fail-under = 9.0
 
 [tool.pylint."messages control"]
-disable = ["too-many-branches", "too-many-locals"]
+# The connector class legitimately holds API config as instance state, and its
+# constructor mirrors the auth/cache options as keyword arguments.
+disable = [
+    "too-many-branches",
+    "too-many-locals",
+    "too-many-instance-attributes",
+    "too-many-arguments",
+    "too-many-positional-arguments",
+]

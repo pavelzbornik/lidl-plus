@@ -53,6 +53,8 @@ def get_arguments():
         help="choose two factor auth method",
     )
     parser.add_argument("-r", "--refresh-token", metavar="TOKEN", help="refresh token to authenticate")
+    parser.add_argument("--cache", help="cache API responses locally", action="store_true")
+    parser.add_argument("--cache-dir", metavar="DIR", help="directory for the local cache")
     parser.add_argument("--skip-verify", help="skip ssl verification", action="store_true")
     parser.add_argument(
         "--not-accept-legal-terms",
@@ -101,11 +103,12 @@ def lidl_plus_login(args):
         os.environ["CURL_CA_BUNDLE"] = ""
     language = args.get("language") or input("Enter your language (de, en, ...): ")
     country = args.get("country") or input("Enter your country (DE, AT, ...): ")
+    cache_kwargs = {"cache": args.get("cache", False), "cache_dir": args.get("cache_dir")}
     if args.get("refresh_token"):
-        return LidlPlusApi(language, country, args.get("refresh_token"))
+        return LidlPlusApi(language, country, args.get("refresh_token"), **cache_kwargs)
     email = args.get("email") or input("Enter your lidl plus email: ")
     password = args.get("password") or getpass("Enter your lidl plus password: ")
-    lidl_plus = LidlPlusApi(language, country)
+    lidl_plus = LidlPlusApi(language, country, **cache_kwargs)
     try:
         text = f"Enter the verify code you received via {args['2fa']}: "
         lidl_plus.login(

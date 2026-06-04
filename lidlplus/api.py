@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 import requests
 
+from lidlplus.cache import FileCache, cached
 from lidlplus.exceptions import (
     WebBrowserException,
     LoginError,
@@ -60,7 +61,21 @@ class LidlPlusApi:
     _APP_VERSION = "15.30.0"
     _TIMEOUT = 10
 
-    def __init__(self, language, country, refresh_token=""):
+    # Per-endpoint cache lifetimes in seconds; ``None`` means cache forever.
+    # A past receipt is immutable, so its detail is cached permanently; volatile
+    # data (coupons, ticket lists) gets a short TTL, and near-static data (stores,
+    # countries, profile) a long one.
+    _CACHE_TTL = {
+        "ticket": None,
+        "tickets": 5 * 60,
+        "coupons": 5 * 60,
+        "stores": 24 * 60 * 60,
+        "countries": 7 * 24 * 60 * 60,
+        "user_info": 24 * 60 * 60,
+        "loyalty_id": 24 * 60 * 60,
+    }
+
+    def __init__(self, language, country, refresh_token="", cache=False, cache_dir=None):
         self._login_url = ""
         self._code_verifier = ""
         self._refresh_token = refresh_token
@@ -68,6 +83,9 @@ class LidlPlusApi:
         self._token = ""
         self._country = country.upper()
         self._language = language.lower()
+        # Opt-in local cache. Enabled when cache=True or an explicit cache_dir is
+        # given; otherwise every call goes to the network as before.
+        self._cache = FileCache(cache_dir) if (cache or cache_dir) else None
 
     @property
     def refresh_token(self):
@@ -330,23 +348,33 @@ class LidlPlusApi:
             If set to False (the default), all tickets will be retrieved.
         :type onlyFavorite: bool
         """
-        url = f"{self._TICKET_API}/v2/{self._country}/tickets"
-        kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
-        ticket = requests.get(f"{url}?pageNumber=1&onlyFavorite={only_favorite}", **kwargs).json()
-        tickets = ticket["tickets"]
-        for i in range(2, int(ticket["totalCount"] / ticket["size"] + 2)):
-            tickets += requests.get(f"{url}?pageNumber={i}", **kwargs).json()["tickets"]
-        return tickets
+
+        def _fetch():
+            url = f"{self._TICKET_API}/v2/{self._country}/tickets"
+            kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
+            first = requests.get(f"{url}?pageNumber=1&onlyFavorite={only_favorite}", **kwargs).json()
+            result = first["tickets"]
+            for i in range(2, int(first["totalCount"] / first["size"] + 2)):
+                result += requests.get(f"{url}?pageNumber={i}", **kwargs).json()["tickets"]
+            return result
+
+        key = f"tickets:{self._country}:{only_favorite}"
+        return cached(self._cache, key, self._CACHE_TTL["tickets"], _fetch)
 
     def ticket(self, ticket_id):
         """Get full data of single ticket by id"""
-        kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
-        url = f"{self._TICKET_API}/v3/{self._country}/tickets/{ticket_id}"
-        receipt_json = requests.get(url, **kwargs).json()
-        return parse_html_receipt(
-            date=receipt_json["date"],
-            html_receipt=receipt_json["htmlPrintedReceipt"],
-        )
+
+        def _fetch():
+            kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
+            url = f"{self._TICKET_API}/v3/{self._country}/tickets/{ticket_id}"
+            receipt_json = requests.get(url, **kwargs).json()
+            return parse_html_receipt(
+                date=receipt_json["date"],
+                html_receipt=receipt_json["htmlPrintedReceipt"],
+            )
+
+        key = f"ticket:{self._country}:{ticket_id}"
+        return cached(self._cache, key, self._CACHE_TTL["ticket"], _fetch)
 
     def coupon_promotions_v1(self):
         """Get list of all coupon promotions.
@@ -355,15 +383,29 @@ class LidlPlusApi:
         kept for backwards compatibility). Returns
         ``{"sections": [{"name": ..., "promotions": [...]}]}``.
         """
-        url = f"{self._COUPONS_APP_API}/v3/promotionslist"
-        kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
-        return requests.get(url, **kwargs).json()
+
+        def _fetch():
+            url = f"{self._COUPONS_APP_API}/v3/promotionslist"
+            kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
+            return requests.get(url, **kwargs).json()
+
+        return cached(self._cache, self._coupons_cache_key(), self._CACHE_TTL["coupons"], _fetch)
+
+    def _coupons_cache_key(self):
+        return f"coupons:{self._country}"
+
+    def _invalidate_coupons(self):
+        """Drop the cached coupon list after a change so the next read is fresh."""
+        if self._cache is not None:
+            self._cache.delete(self._coupons_cache_key())
 
     def activate_coupon_promotion_v1(self, promotion_id):
         """Activate a single coupon promotion by id (``/app/api/v2/promotions/{id}/activation``)."""
         url = f"{self._COUPONS_APP_API}/v2/promotions/{promotion_id}/activation"
         kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
-        return requests.post(url, **kwargs)
+        response = requests.post(url, **kwargs)
+        self._invalidate_coupons()
+        return response
 
     def coupons(self):
         """Get list of all coupon promotions.
@@ -382,7 +424,9 @@ class LidlPlusApi:
         """Deactivate single coupon by id (``/app/api/v2/promotions/{id}/activation``)."""
         url = f"{self._COUPONS_APP_API}/v2/promotions/{coupon_id}/activation"
         kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
-        return requests.delete(url, **kwargs)
+        response = requests.delete(url, **kwargs)
+        self._invalidate_coupons()
+        return response
 
     def user_info(self):
         """Get the OpenID Connect profile claims for the logged-in user.
@@ -390,11 +434,15 @@ class LidlPlusApi:
         Served by ``accounts.lidl.com/connect/userinfo``; includes ``sub`` (a stable
         per-account identifier), ``name``, ``email``, ``phone_number`` and more.
         """
-        url = f"{self._AUTH_API}/connect/userinfo"
-        kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
-        response = requests.get(url, **kwargs)
-        response.raise_for_status()
-        return response.json()
+
+        def _fetch():
+            url = f"{self._AUTH_API}/connect/userinfo"
+            kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
+            response = requests.get(url, **kwargs)
+            response.raise_for_status()
+            return response.json()
+
+        return cached(self._cache, f"user_info:{self._country}", self._CACHE_TTL["user_info"], _fetch)
 
     def loyalty_id(self):
         """Get your loyalty card ID (the number behind your in-store Lidl Plus barcode).
@@ -402,11 +450,15 @@ class LidlPlusApi:
         Served as plain text by ``profile.lidlplus.com/api/v1/{country}/loyalty``.
         (The package previously used a wrong ``/profile/api/...`` path that 404'd.)
         """
-        url = f"{self._PROFILE_API}/v1/{self._country}/loyalty"
-        kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
-        response = requests.get(url, **kwargs)
-        response.raise_for_status()
-        return response.text
+
+        def _fetch():
+            url = f"{self._PROFILE_API}/v1/{self._country}/loyalty"
+            kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
+            response = requests.get(url, **kwargs)
+            response.raise_for_status()
+            return response.text
+
+        return cached(self._cache, f"loyalty_id:{self._country}", self._CACHE_TTL["loyalty_id"], _fetch)
 
     def stores(self):
         """Get the list of stores for the configured country.
@@ -414,16 +466,29 @@ class LidlPlusApi:
         Public endpoint (no authentication) on ``stores.lidlplus.com/api/v4/{country}``;
         returns store key, name, address and geo-location.
         """
-        url = f"{self._STORES_API}/v4/{self._country}"
-        kwargs = {"headers": {"User-Agent": self._USER_AGENT}, "timeout": self._TIMEOUT}
-        response = requests.get(url, **kwargs)
-        response.raise_for_status()
-        return response.json()
+
+        def _fetch():
+            url = f"{self._STORES_API}/v4/{self._country}"
+            kwargs = {"headers": {"User-Agent": self._USER_AGENT}, "timeout": self._TIMEOUT}
+            response = requests.get(url, **kwargs)
+            response.raise_for_status()
+            return response.json()
+
+        return cached(self._cache, f"stores:{self._country}", self._CACHE_TTL["stores"], _fetch)
 
     def countries(self):
         """Get the list of supported Lidl Plus countries (public, no authentication)."""
-        url = f"{self._CONFIG_API}/v3/countries"
-        kwargs = {"headers": {"User-Agent": self._USER_AGENT}, "timeout": self._TIMEOUT}
-        response = requests.get(url, **kwargs)
-        response.raise_for_status()
-        return response.json()
+
+        def _fetch():
+            url = f"{self._CONFIG_API}/v3/countries"
+            kwargs = {"headers": {"User-Agent": self._USER_AGENT}, "timeout": self._TIMEOUT}
+            response = requests.get(url, **kwargs)
+            response.raise_for_status()
+            return response.json()
+
+        return cached(self._cache, "countries", self._CACHE_TTL["countries"], _fetch)
+
+    def clear_cache(self):
+        """Remove all locally cached API responses (no-op if caching is disabled)."""
+        if self._cache is not None:
+            self._cache.clear()
