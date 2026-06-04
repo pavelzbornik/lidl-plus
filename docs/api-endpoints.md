@@ -27,6 +27,7 @@ Some endpoints additionally require a `Country: <CC>` header (noted below).
 | --- | --- | --- |
 | GET | `/connect/authorize` | Start OAuth2 + PKCE login (browser flow). |
 | POST | `/connect/token` | Exchange `authorization_code` or `refresh_token` for an access token. |
+| GET | `/connect/userinfo` | OpenID Connect profile claims (`name`, `email`, `sub`, …). |
 
 See [authentication.md](authentication.md) for the full flow.
 
@@ -41,7 +42,7 @@ See [authentication.md](authentication.md) for the full flow.
 | GET | `coupons.lidlplus.com/app/api/v1/promotionslist` *(needs `Country` header)* | `coupons()` and `coupon_promotions_v1()` | ✅ 200 |
 | POST | `coupons.lidlplus.com/app/api/v1/promotions/{id}/activation` *(`Country` header)* | `activate_coupon(id)` and `activate_coupon_promotion_v1(id)` | mutating — not probed |
 | DELETE | `coupons.lidlplus.com/app/api/v1/promotions/{id}/activation` *(`Country` header)* | `deactivate_coupon(id)` | mutating — not probed |
-| GET | `profile.lidlplus.com/profile/api/v1/{CC}/loyalty` | `loyalty_id()` | ❌ 404 — **appears moved/removed** |
+| GET | `accounts.lidl.com/connect/userinfo` | `user_info()`; `loyalty_id()` (returns the `sub` claim) | ✅ 200 |
 
 > The legacy v2 coupon endpoints (`coupons.lidlplus.com/api/v2/{CC}` and
 > `…/api/v1/{CC}/{id}/activation`) were retired by Lidl (404). `coupons()`,
@@ -55,8 +56,11 @@ See [authentication.md](authentication.md) for the full flow.
   (`/app/api/v1/promotionslist` + `/promotions/{id}/activation`). The legacy v2 endpoints were
   retired (404); `coupons()` / `activate_coupon()` / `deactivate_coupon()` have been repointed to
   V1 and the CLI `coupon` command was consolidated onto the single working path.
-- **`loyalty_id()` is broken** — the `profile/api/v1/{CC}/loyalty` route returns an nginx 404
-  (the path no longer exists on that host).
+- **Loyalty/profile moved to OIDC.** The whole `profile.lidlplus.com` host was retired (every
+  path returns nginx 404). `loyalty_id()` was repointed to the `sub` claim from
+  `accounts.lidl.com/connect/userinfo`, and a new `user_info()` exposes the full profile claims.
+  Caveat: `sub` is the stable account identifier, *not* the legacy scannable loyalty-card number —
+  that number is no longer exposed by any reachable endpoint.
 
 ---
 
@@ -92,5 +96,5 @@ and probed for current reachability:
 
 - ✅ Done: repointed `coupons()` / `activate_coupon()` / `deactivate_coupon()` to the live V1
   promotions API and consolidated the CLI `coupon` command.
-- Re-discover the current **loyalty ID** route, or remove `loyalty_id()` if it's gone.
+- ✅ Done: `loyalty_id()` repointed to the OIDC `sub` claim; added `user_info()`.
 - Stores/alerts/Lidl-Pay would need fresh reverse engineering before they could be added.

@@ -366,10 +366,25 @@ class LidlPlusApi:
         kwargs = {"headers": {**self._default_headers(), "Country": self._country}, "timeout": self._TIMEOUT}
         return requests.delete(url, **kwargs)
 
-    def loyalty_id(self):
-        """Get your loyalty ID"""
-        url = f"{self._PROFILE_API}/v1/{self._country}/loyalty"
+    def user_info(self):
+        """Get the OpenID Connect profile claims for the logged-in user.
+
+        Served by ``accounts.lidl.com/connect/userinfo``; includes ``sub`` (a stable
+        per-account identifier), ``name``, ``email``, ``phone_number`` and more.
+        """
+        url = f"{self._AUTH_API}/connect/userinfo"
         kwargs = {"headers": self._default_headers(), "timeout": self._TIMEOUT}
         response = requests.get(url, **kwargs)
         response.raise_for_status()
-        return response.text
+        return response.json()
+
+    def loyalty_id(self):
+        """Get your loyalty/account ID.
+
+        The dedicated loyalty endpoint (``profile.lidlplus.com/.../loyalty``) and its
+        whole host were retired by Lidl (404). This now returns the OpenID Connect
+        subject id (``sub``) from :meth:`user_info` — a stable per-account identifier.
+        Note: this is *not* the legacy scannable loyalty-card number, which the API no
+        longer exposes anywhere reachable.
+        """
+        return self.user_info()["sub"]
